@@ -1,0 +1,19 @@
+import { useEffect } from 'react';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:5000'); // Backend URL
+
+function CustomerPanel({ customerId }) {
+  useEffect(() => {
+    // Customer login event emit karna
+    socket.emit('customerLogin', customerId);
+
+    return () => {
+      socket.disconnect(); // Cleanup on unmount
+    };
+  }, [customerId]);
+
+  return <h1>Welcome, Customer {customerId}</h1>;
+}
+
+export default CustomerPanel;
