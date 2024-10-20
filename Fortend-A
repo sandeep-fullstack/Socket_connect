@@ -1,0 +1,55 @@
+import { useEffect, useState } from 'react';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:5000'); // Backend URL
+
+function AdminDashboard({ customers }) {
+  const [customerStatuses, setCustomerStatuses] = useState({}); // Statuses ka state
+
+  useEffect(() => {
+    // Jab admin login kare to puri status list mile
+    socket.emit('adminLogin');
+
+    // Status list receive karna
+    socket.on('statusList', (statusList) => {
+      setCustomerStatuses(statusList); // Status list ko state me set karna
+    });
+
+    // Har status update ko receive karna
+    socket.on('statusUpdate', ({ customerId, status }) => {
+      setCustomerStatuses((prev) => ({
+        ...prev,
+        [customerId]: { ...prev[customerId], status },
+      }));
+    });
+
+    return () => {
+      socket.off('statusList');
+      socket.off('statusUpdate'); // Cleanup events on unmount
+    };
+  }, []);
+
+  return (
+    <div>
+      <h1>Customer List</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Customer ID</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {customers.map((customer) => (
+            <tr key={customer._id}>
+              <td>{customer.name}</td>
+              <td>{customerStatuses[customer._id]?.status || 'offline'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default AdminDashboard;
