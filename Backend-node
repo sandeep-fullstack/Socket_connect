@@ -1,0 +1,67 @@
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const { ObjectId } = require('mongodb'); // ObjectId import
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: '*',
+  },
+});
+
+let customersStatus = {}; // Sabhi customers ka status store karne ka object
+
+io.on('connection', (socket) => {
+  console.log('New client connected:', socket.id);
+
+  // Admin login hone par puri status list bhejna
+  socket.on('adminLogin', () => {
+    console.log('Admin connected:', socket.id);
+    socket.emit('statusList', customersStatus); // Admin ko puri status list bhejte hain
+  });
+
+  // Customer login hone par
+  socket.on('customerLogin', (customerId) => {
+    const id = customerId.toString();
+    console.log(`Customer ${id} logged in`);
+
+    customersStatus[id] = {
+      status: 'online',
+      lastSeen: null,
+      socketId: socket.id,
+    };
+
+    io.emit('statusUpdate', { customerId: id, status: 'online' }); // Sabhi admins ko update bhejna
+  });
+
+  // Customer disconnect hone par
+  socket.on('disconnect', () => {
+    const disconnectedCustomer = Object.keys(customersStatus).find(
+      (key) => customersStatus[key].socketId === socket.id
+    );
+
+    if (disconnectedCustomer) {
+      console.log(`Customer ${disconnectedCustomer} disconnected`);
+
+      // Status ko 15 minutes tak online hi rakhna
+      customersStatus[disconnectedCustomer].lastSeen = new Date();
+
+      setTimeout(() => {
+        const now = new Date();
+        const diff = Math.abs(now - customersStatus[disconnectedCustomer].lastSeen) / 1000;
+
+        if (diff >= 900) { // 15 minutes ke baad status offline ho
+          customersStatus[disconnectedCustomer].status = 'offline';
+          io.emit('statusUpdate', { customerId: disconnectedCustomer, status: 'offline' });
+        }
+      }, 15 * 60 * 1000); // 15 minutes ka timeout
+    }
+  });
+});
+
+const PORT = 5000;
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
